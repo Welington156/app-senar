@@ -340,36 +340,44 @@ function RecoverScreen({ onBack }) {
 function MainScreen({ userData, products, onLogout }) {
   const [selectedProd, setSelectedProd] = useState(null);
   const [activeCategory, setActiveCategory] = useState('Todas');
-  const [searchQuery, setSearchQuery] = useState(''); // <-- NOVO: Estado da busca
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const categories = ['Todas', 'Fruta', 'Verdura', 'Legume', 'Processado', 'Outro'];
+  const categories = ['Todas', 'Fruta', 'Verdura', 'Legume', 'Processado', 'Animal', 'Outro'];
 
-  // LÓGICA DE FILTRAGEM TURBINADA (Estoque + Categoria + Busca de Texto)
   const filteredProducts = products.filter(p => {
     const hasStock = p.stock === undefined || p.stock > 0;
     const matchesCategory = activeCategory === 'Todas' || p.category === activeCategory;
-    
-    // Transforma tudo em minúsculo para a busca não dar erro com letras maiúsculas/minúsculas
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
-    
     return hasStock && matchesCategory && matchesSearch;
   });
 
   const openWhatsApp = (produto) => {
-    // Busca os dados do dono do produto lá no nosso "Banco de Dados"
     const donoDoProduto = usersDB[produto.producerId];
-    
-    // Se o dono tiver telefone, usa ele. Se não, usa um padrão (caso seja um produto antigo)
     const telefone = donoDoProduto?.phone || "38999999999"; 
-    
-    // Remove qualquer traço ou espaço do telefone para não dar erro no link
     const numeroLimpo = telefone.replace(/\D/g, ''); 
-    
     const mensagem = `Olá, ${produto.producer}! Vi o anúncio de *${produto.name}* no AgroSocial e tenho interesse.`;
     
     Linking.openURL(`whatsapp://send?phone=55${numeroLimpo}&text=${mensagem}`).catch(() => {
       Alert.alert('Erro', 'WhatsApp não encontrado no dispositivo.');
     });
+  };
+
+  // Função para desenhar as estrelinhas baseado na nota
+  const renderStars = (rating) => {
+    const stars = [];
+    const fullStars = Math.floor(rating || 0);
+    const hasHalfStar = (rating || 0) - fullStars >= 0.5;
+
+    for (let i = 0; i < 5; i++) {
+      if (i < fullStars) {
+        stars.push(<MaterialCommunityIcons key={i} name="star" size={16} color="#FFD700" />);
+      } else if (i === fullStars && hasHalfStar) {
+        stars.push(<MaterialCommunityIcons key={i} name="star-half-full" size={16} color="#FFD700" />);
+      } else {
+        stars.push(<MaterialCommunityIcons key={i} name="star-outline" size={16} color="#FFD700" />);
+      }
+    }
+    return stars;
   };
 
   return (
@@ -389,18 +397,13 @@ function MainScreen({ userData, products, onLogout }) {
         </View>
       </View>
 
-      {/* --- NOVO: BARRA DE PESQUISA --- */}
       <View style={{ paddingHorizontal: 15, paddingTop: 10, backgroundColor: '#FFF' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5F5F5', borderRadius: 12, paddingHorizontal: 15, height: 45, borderWidth: 1, borderColor: '#E0E0E0' }}>
           <MaterialCommunityIcons name="magnify" size={24} color="#999" />
           <TextInput 
             style={{ flex: 1, marginLeft: 10, fontSize: 16, color: '#333' }}
-            placeholder="Buscar produtos..."
-            placeholderTextColor="#999"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
+            placeholder="Buscar produtos..." placeholderTextColor="#999" value={searchQuery} onChangeText={setSearchQuery}
           />
-          {/* Só mostra o botão de limpar (X) se tiver algo digitado */}
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={() => setSearchQuery('')}>
               <MaterialCommunityIcons name="close-circle" size={20} color="#999" />
@@ -413,12 +416,10 @@ function MainScreen({ userData, products, onLogout }) {
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {categories.map(cat => (
             <TouchableOpacity 
-              key={cat} 
-              onPress={() => setActiveCategory(cat)}
+              key={cat} onPress={() => setActiveCategory(cat)}
               style={{
                 backgroundColor: activeCategory === cat ? '#4CAF50' : '#F5F5F5',
-                paddingHorizontal: 16, paddingVertical: 8,
-                borderRadius: 20, marginHorizontal: 5,
+                paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginHorizontal: 5,
                 borderWidth: 1, borderColor: activeCategory === cat ? '#4CAF50' : '#E0E0E0'
               }}>
               <Text style={{ color: activeCategory === cat ? '#FFF' : '#666', fontWeight: 'bold' }}>{cat}</Text>
@@ -434,6 +435,13 @@ function MainScreen({ userData, products, onLogout }) {
             <Image source={{ uri: item.image }} style={C.cardImg} />
             <View style={C.cardInfo}>
               <Text style={C.cardName} numberOfLines={2}>{item.name}</Text>
+              
+              {/* --- NOVO: Estrelinhas no Card --- */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 4 }}>
+                {renderStars(item.rating)}
+                <Text style={{ fontSize: 12, color: '#666', marginLeft: 4 }}>({item.reviews || 0})</Text>
+              </View>
+
               <Text style={C.cardPrice}>R$ {item.price}<Text style={C.cardUnit}>/{item.unit}</Text></Text>
               <Text style={C.cardProducer}>👨‍🌾 {item.producer}</Text>
             </View>
@@ -443,10 +451,7 @@ function MainScreen({ userData, products, onLogout }) {
             </View>
           </TouchableOpacity>
         )} 
-        keyExtractor={i => i.id} 
-        numColumns={2} 
-        contentContainerStyle={{ padding: 8, paddingBottom: 20 }} 
-        showsVerticalScrollIndicator={false}
+        keyExtractor={i => i.id} numColumns={2} contentContainerStyle={{ padding: 8, paddingBottom: 20 }} showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={{ alignItems: 'center', marginTop: 50 }}>
             <Text style={{ fontSize: 40, marginBottom: 10 }}>🔍</Text>
@@ -477,7 +482,15 @@ function MainScreen({ userData, products, onLogout }) {
                 )}
 
                 <Text style={{ fontSize: 26, fontWeight: 'bold', color: '#333' }}>{selectedProd.name}</Text>
-                <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#4CAF50', marginTop: 5 }}>
+                
+                {/* --- NOVO: Avaliação Detalhada no Modal --- */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 5 }}>
+                  <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#333', marginRight: 5 }}>{selectedProd.rating || 'Sem nota'}</Text>
+                  {renderStars(selectedProd.rating)}
+                  <Text style={{ fontSize: 14, color: '#666', marginLeft: 8 }}>({selectedProd.reviews || 0} avaliações)</Text>
+                </View>
+
+                <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#4CAF50', marginTop: 15 }}>
                   R$ {selectedProd.price} <Text style={{ fontSize: 14, color: '#999' }}>por {selectedProd.unit}</Text>
                 </Text>
 
@@ -485,7 +498,7 @@ function MainScreen({ userData, products, onLogout }) {
                   <Text style={{ fontSize: 40, marginRight: 15 }}>👨‍🌾</Text>
                   <View>
                     <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#333' }}>{selectedProd.producer}</Text>
-                    <Text style={{ fontSize: 14, color: '#666' }}>Produtor Local - Janaúba</Text>
+                    <Text style={{ fontSize: 14, color: '#666' }}>Produtor Local</Text>
                   </View>
                 </View>
 
@@ -496,15 +509,25 @@ function MainScreen({ userData, products, onLogout }) {
 
                 <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#333', marginTop: 20, marginBottom: 10 }}>Retirada / Entrega</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#E8F5E9', padding: 12, borderRadius: 10 }}>
-                    <MaterialCommunityIcons name="map-marker" size={20} color="#4CAF50" />
-                    <Text style={{ fontSize: 14, color: '#333', marginLeft: 8, flex: 1 }}>
-                        {/* Faz o Join com usersDB para pegar o endereço real */}
-                        {usersDB[selectedProd.producerId]?.address || 'Endereço não informado.'}
-                    </Text>
+                  <MaterialCommunityIcons name="map-marker" size={20} color="#4CAF50" />
+                  <Text style={{ fontSize: 14, color: '#333', marginLeft: 8, flex: 1 }}>
+                    {usersDB[selectedProd.producerId]?.address || 'Endereço não informado.'}
+                  </Text>
                 </View>
 
+                {/* --- NOVO: Botão de Avaliar para Clientes --- */}
+                {userData.type === 'customer' && (
+                  <TouchableOpacity 
+                    style={{ marginTop: 20, padding: 15, borderRadius: 10, borderWidth: 1, borderColor: '#FFD700', alignItems: 'center', flexDirection: 'row', justifyContent: 'center' }}
+                    onPress={() => Alert.alert('Avaliar', 'A tela de dar nota abrirá aqui em breve!')}
+                  >
+                    <MaterialCommunityIcons name="star-outline" size={24} color="#FBC02D" />
+                    <Text style={{ marginLeft: 10, color: '#FBC02D', fontWeight: 'bold', fontSize: 16 }}>Avaliar este produto</Text>
+                  </TouchableOpacity>
+                )}
+
                 <TouchableOpacity 
-                  style={[C.btn, { backgroundColor: '#25D366', marginTop: 30, flexDirection: 'row', justifyContent: 'center', gap: 10 }]} 
+                  style={[C.btn, { backgroundColor: '#25D366', marginTop: 20, flexDirection: 'row', justifyContent: 'center', gap: 10 }]} 
                   onPress={() => openWhatsApp(selectedProd)}>
                   <MaterialCommunityIcons name="whatsapp" size={24} color="#FFF" />
                   <Text style={C.btnText}>Comprar no WhatsApp</Text>
@@ -564,7 +587,7 @@ function ProducerScreen({ userData, products, onAddProduct }) {
   const [stock, setStock] = useState('');
 
   // Lista de categorias pré-definidas
-  const categoriasOptions = ['Fruta', 'Verdura', 'Legume', 'Processado', 'Outro'];
+  const categoriasOptions = ['Fruta', 'Verdura', 'Legume', 'Animal','Processado', 'Outro'];
 
   const myProducts = products.filter(p => p.producer === userData.name);
 
@@ -728,6 +751,98 @@ function ProducerScreen({ userData, products, onAddProduct }) {
   );
 }
 
+function FeedScreen() {
+  const [activeTab, setActiveTab] = useState('Tudo');
+  const tabs = ['Tudo', 'Notícias', 'Receitas'];
+
+  // Nosso banco de dados falso de notícias e receitas
+  const feedData = [
+    { id: '1', type: 'Notícia', source: 'Globo Rural', title: 'Preço do bezerro tem alta histórica e anima pecuaristas em Minas Gerais', image: 'https://images.unsplash.com/photo-1596733430284-f74370603053?w=400', url: 'https://globorural.globo.com/' },
+    { id: '2', type: 'Notícia', source: 'Senar', title: 'Senar abre novas vagas para cursos gratuitos de capacitação rural', image: 'https://images.unsplash.com/photo-1589923188900-85dae523342b?w=400', url: 'https://cnabrasil.org.br/senar' },
+    { id: '3', type: 'Receita', source: 'Receitas (Globo)', title: 'Bolo de Milho Cremoso: a verdadeira receita tradicional da roça', image: 'https://images.unsplash.com/photo-1588673550882-7f28ed061214?w=400', url: 'https://receitas.globo.com/' },
+    { id: '4', type: 'Notícia', source: 'Embrapa', title: 'Novas tecnologias no plantio ajudam agricultores a economizar água', image: 'https://images.unsplash.com/photo-1628186105307-de747c3e55c7?w=400', url: 'https://www.embrapa.br/' },
+    { id: '5', type: 'Receita', source: 'Emater', title: 'Passo a passo: Como fazer o autêntico Doce de Leite Artesanal', image: 'https://images.unsplash.com/photo-1620291307137-0ea87e6cc522?w=400', url: 'https://www.emater.mg.gov.br/' },
+  ];
+
+  // Lógica para filtrar o que aparece na tela
+  const filteredFeed = feedData.filter(item => 
+    activeTab === 'Tudo' || 
+    (activeTab === 'Notícias' && item.type === 'Notícia') || 
+    (activeTab === 'Receitas' && item.type === 'Receita')
+  );
+
+  const openLink = (url) => {
+    Linking.openURL(url).catch(() => Alert.alert('Erro', 'Não foi possível abrir o link.'));
+  };
+
+  return (
+    <SafeAreaView style={C.container}>
+      <StatusBar backgroundColor="#1B5E20" barStyle="light-content" />
+      
+      {/* Cabeçalho */}
+      <View style={[C.header, { justifyContent: 'center', alignItems: 'center', paddingBottom: 15 }]}>
+        <Text style={C.headerTitle}>📰 Campo e Cozinha</Text>
+        <Text style={{ color: '#E8F5E9', fontSize: 14 }}>Notícias do agro e receitas rurais</Text>
+      </View>
+
+      {/* Filtros: Tudo / Notícias / Receitas */}
+      <View style={{ flexDirection: 'row', padding: 15, backgroundColor: '#FFF', elevation: 2, gap: 10 }}>
+        {tabs.map(tab => (
+          <TouchableOpacity 
+            key={tab} 
+            onPress={() => setActiveTab(tab)}
+            style={{
+              flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 20,
+              backgroundColor: activeTab === tab ? '#1B5E20' : '#F5F5F5',
+              borderWidth: 1, borderColor: activeTab === tab ? '#1B5E20' : '#E0E0E0'
+            }}>
+            <Text style={{ color: activeTab === tab ? '#FFF' : '#666', fontWeight: 'bold' }}>{tab}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Lista de Notícias/Receitas */}
+      <FlatList 
+        data={filteredFeed}
+        keyExtractor={i => i.id}
+        contentContainerStyle={{ padding: 15, paddingBottom: 20 }}
+        showsVerticalScrollIndicator={false}
+        renderItem={({item}) => (
+          <TouchableOpacity 
+            style={{ backgroundColor: '#FFF', borderRadius: 12, marginBottom: 15, elevation: 3, overflow: 'hidden' }}
+            activeOpacity={0.8}
+            onPress={() => openLink(item.url)}
+          >
+            <Image source={{ uri: item.image }} style={{ width: '100%', height: 160 }} />
+            
+            <View style={{ padding: 15 }}>
+              {/* Etiquetas: Fonte (Globo, Embrapa) e Tipo (Notícia, Receita) */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                <Text style={{ color: item.type === 'Notícia' ? '#1976D2' : '#E64A19', fontSize: 12, fontWeight: 'bold', textTransform: 'uppercase' }}>
+                  {item.type}
+                </Text>
+                <Text style={{ color: '#999', fontSize: 12, fontWeight: 'bold' }}>
+                  Fonte: {item.source}
+                </Text>
+              </View>
+
+              {/* Título da Matéria */}
+              <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#333', lineHeight: 22 }}>
+                {item.title}
+              </Text>
+              
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10 }}>
+                <Text style={{ color: '#4CAF50', fontSize: 14, fontWeight: 'bold', marginRight: 5 }}>Ler matéria completa</Text>
+                <MaterialCommunityIcons name="open-in-new" size={16} color="#4CAF50" />
+              </View>
+            </View>
+          </TouchableOpacity>
+        )}
+      />
+    </SafeAreaView>
+  );
+}
+
 export default function App() {
   // 1. TODAS as variáveis e estados ficam no topo da função!
   const [screen, setScreen] = useState('login');
@@ -735,11 +850,11 @@ export default function App() {
   const Tab = createBottomTabNavigator();
   
   // Lista de produtos viva movida para o topo
-  const [productsList, setProductsList] = useState([
-   { id: '1', name: 'Tomate Orgânico', price: '8,90', unit: 'kg', producerId: 'joao', category: 'Verdura', image: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=400', producer: 'João Silva' },
-    { id: '2', name: 'Banana Prata', price: '5,50', unit: 'kg', producerId: 'joao', category: 'Fruta', image: 'https://images.unsplash.com/photo-1603833665858-e61d17a86224?w=400', producer: 'João Silva' },
-    { id: '3', name: 'Alface', price: '3,50', unit: 'un', image: 'https://images.unsplash.com/photo-1622206151226-18ca2c9ab4a1?w=400', producer: 'João Silva' },
-    { id: '4', name: 'Queijo Minas', price: '28,00', unit: 'un', image: 'https://images.unsplash.com/photo-1552767059-ce182ead6c1b?w=400', producer: 'Ana Paula' },
+const [productsList, setProductsList] = useState([
+    { id: '1', name: 'Tomate Orgânico', price: '8,90', unit: 'kg', producerId: 'joao', category: 'Verdura', stock: 15, rating: 4.8, reviews: 12, description: 'Tomate fresquinho, sem agrotóxicos.', image: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=400', producer: 'João Silva' },
+    { id: '2', name: 'Banana Prata', price: '5,50', unit: 'kg', producerId: 'joao', category: 'Fruta', stock: 20, rating: 5.0, reviews: 8, description: 'Banana docinha da roça.', image: 'https://images.unsplash.com/photo-1603833665858-e61d17a86224?w=400', producer: 'João Silva' },
+    { id: '3', name: 'Alface', price: '3,50', unit: 'un', producerId: 'joao', category: 'Verdura', stock: 10, rating: 4.5, reviews: 5, description: 'Alface crocante colhida hoje.', image: 'https://images.unsplash.com/photo-1622206151226-18ca2c9ab4a1?w=400', producer: 'João Silva' },
+    { id: '4', name: 'Queijo Minas', price: '28,00', unit: 'un', producerId: 'joao', category: 'Processado', stock: 5, rating: 4.9, reviews: 34, description: 'Queijo curado padrão da serra.', image: 'https://images.unsplash.com/photo-1552767059-ce182ead6c1b?w=400', producer: 'Ana Paula' },
   ]);
 
   // 2. Lógica de telas soltas (Login, Registro, etc)
@@ -780,11 +895,7 @@ export default function App() {
           </Tab.Screen>
         ) : (
           <Tab.Screen name="Feed">
-            {() => (
-              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <Text style={{ fontSize: 18, color: '#333' }}>📰 Feed de Notícias (Emater)</Text>
-              </View>
-            )}
+            {() => <FeedScreen/>}
           </Tab.Screen>
         )}
 
